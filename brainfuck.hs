@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+-- {-# OPTIONS_GHC -fwarn-incomplete-patterns \#-}
 import           Control.Monad.Trans.State
 import           Data.Char
-import           Debug.Trace
 import           Prelude                           hiding (putChar)
 import           System.Directory.Internal.Prelude (getArgs)
 
@@ -9,10 +9,8 @@ data Operator = Increase | Decrease | MoveRight | MoveLeft | PutChar | GetChar |
   deriving (Show, Eq)
 
 
-data Tape a = Tape [a] a [a]
+newtype Tape a = Tape ([a], a, [a])
 
--- parseBrainFuckOp :: String -> [Operator]
--- parseBrainFuckOp (x:xs)
 
 parseBrainFuckOp :: [Char] -> [Operator]
 parseBrainFuckOp ('>':xs) = MoveRight : parseBrainFuckOp xs
@@ -22,12 +20,24 @@ parseBrainFuckOp ('-':xs) = Decrease :  parseBrainFuckOp xs
 parseBrainFuckOp ('.':xs) = PutChar :   parseBrainFuckOp xs
 parseBrainFuckOp (',':xs) = GetChar :   parseBrainFuckOp xs
 parseBrainFuckOp ('[':xs) = Loop (parseBrainFuckOp xsB) : parseBrainFuckOp xsA
-    where   xsB = takeWhile (/=']') xs
-            xsA = dropWhile (/=']') xs
+    where   xsB = takeTillMatchingBracket xs 1
+            xsA = drop (length xsB) xs
 parseBrainFuckOp (']':xs) = parseBrainFuckOp xs
-parseBrainFuckOp _ = []
+parseBrainFuckOp ('@':xs) = []
+parseBrainFuckOp (x:xs) = parseBrainFuckOp xs
+parseBrainFuckOp [] = []
 
-ogTape = Tape [] 0 [0| i <- [1..]]
+
+takeTillMatchingBracket :: [Char] -> Int -> [Char]
+takeTillMatchingBracket (']':xs) 1   =  []
+takeTillMatchingBracket (']':xs) count = ']': takeTillMatchingBracket xs (count - 1)
+takeTillMatchingBracket ('[':xs) count = '[': takeTillMatchingBracket xs (count + 1)
+takeTillMatchingBracket (x:xs) count = x : takeTillMatchingBracket xs count
+takeTillMatchingBracket _ _          =  []
+
+
+
+ogTape = Tape ([], 0, replicate 30000 0)
 
 eval :: [Operator] -> State (Tape Int) String
 eval (Increase:xs) = do
@@ -39,10 +49,9 @@ eval (Decrease:xs) = do
                         ys <- eval xs
                         return $ y ++ ys
 eval (PutChar:xs)  = do
-                        -- traceM "puter "
                         y <- putChar
                         ys <- eval xs
-                        return $ y : ys
+                        return $ y ++ ys
 eval (MoveRight:xs) = do
                         y <- moveRight
                         ys <- eval xs
@@ -55,72 +64,63 @@ eval ((Loop ops):xs) = do
                         y <- loop ops
                         ys <- eval xs
                         return $ y ++ ys
-
 eval _             = return ""
--- eval (Increase:xs) = do increase
--- eval (Increase:xs) = do increase
--- eval (Increase:xs) = do increase
--- eval (Increase:xs) = do increase
--- eval (Increase:xs) = do increase
+    where processM f xs = do
+                    y <- f
+                    ys <- eval xs
+                    return $ y ++ ys
 
-
--- eval xs = do
---     -- put ogTape
---     increase
---     increase
---     increase
---     Tape sx x xs <- get
-
---     return $ show x
-
-
+-- {-# INLINE increase #-}
 increase :: State (Tape Int) String
 increase = do
-    Tape sx x xs <- get
-    let resultTape = Tape sx (mod (x + 1) 256) xs
+    Tape (sx, x, xs) <- get
+    let resultTape = Tape (sx, mod (x + 1) 256, xs)
     put resultTape
     return ""
 
+-- {-# INLINE decrease #-}
 decrease :: State (Tape Int) String
 decrease = do
-    Tape sx x xs <- get
-    let resultTape = Tape sx (x - 1) xs
+    Tape (sx, x, xs) <- get
+    let resultTape = Tape (sx, if x == 0 then 255 else x -1, xs)
     put resultTape
     return ""
 
-putChar :: State (Tape Int) Char
+-- {-# INLINE putChar #-}
+putChar :: State (Tape Int) String
 putChar = do
-    traceM "put "
-    Tape sx x xs <- get
-    -- return $ chr (mod x 256)
-    return $ chr x
+    Tape (_, x, _) <- get
+    return [chr x]
 
-
+-- {-# INLINE moveRight #-}
 moveRight :: State (Tape Int) String
 moveRight = do
-    Tape sx x xs <- get
-    traceM "test"
-    put $ Tape (sx ++[x]) (head xs) (tail xs)
+    Tape (sx, x, xs) <- get
+    put $ Tape (x:sx , head xs, tail xs)
     return ""
 
+-- {-# INLINE moveLeft #-}
 moveLeft :: State (Tape Int) String
 moveLeft = do
-    Tape sx x xs <- get
+    Tape (sx, x, xs) <- get
     if null sx
-        then return ()
-        else put $ Tape (init sx ) (last sx) (x: xs)
-    return ""
+        then return ""
+        else do
+                put $ Tape (tail sx, head sx, x: xs)
+                return ""
 
 loop :: [Operator] -> State (Tape Int) String
 loop ys = do
-    Tape _ x _ <- get
+    Tape (sx, x, xs) <- get
     -- if mod x 256 == 0
     if x == 0
     then return ""
     else do
         y <- eval ys
-        ys <- loop ys
-        return $ y ++ ys
+        -- let (y,resultState) = runState (eval ys) $ Tape (sx, x, xs)
+        -- put resultState
+        zs <- loop ys
+        return $ y ++ zs
 
 
 
@@ -130,11 +130,17 @@ main :: IO ()
 main = do
     -- str <- getContents
     args <- getArgs
-    let ops = parseBrainFuckOp $ concat args
+    input <-  lines <$> getContents
+    -- putStr input
+
+    let ops = parseBrainFuckOp $ concat input -- args
 
     let (str,resultState) = runState (eval ops) ogTape
 
-    putStrLn str
+    -- let opsStr = concatMap show ops
+    -- putStrLn opsStr
+
+    putStr str
 
 
 fromString :: String -> String
@@ -144,3 +150,6 @@ fromString xs = evalState (eval (parseBrainFuckOp  xs)) ogTape
 helloworld = fromString "++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++.>+.+++++++..+++.<<++.>+++++++++++++++.>.+++.------.--------.<<+.<."
 
 char = fromString ".+[.+]"
+
+
+test = "+[+++++++++++++++++++++++++++++++++++>]<."
