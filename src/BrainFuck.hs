@@ -3,7 +3,7 @@ module BrainFuck (interpretBF) where
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_GHC -package mtl #-}
 
-import           Control.Monad.State
+import           Control.Monad.State (State, get, put, runState, unless)
 import           Data.Char
 import           Prelude             hiding (putChar)
 
@@ -88,7 +88,7 @@ moveRight = do
 moveLeft :: State (Tape Int) String
 moveLeft = do
     Tape (sx, x, xs) <- get
-    unless (null sx) $ do put $ Tape (tail sx, head sx, x: xs)
+    unless (not (null sx)) $ do put $ Tape (tail sx, head sx, x: xs)
     return ""
 
 loop :: [Operator] -> State (Tape Int) String

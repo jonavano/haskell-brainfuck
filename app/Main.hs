@@ -3,9 +3,9 @@ module Main (main) where
 {-# OPTIONS_GHC -package mtl #-}
 
 
-import           BrainFuck
+import           BrainFuck2
 
 main :: IO ()
 main = do
     input <-  lines <$> getContents
-    interpretBF $ concat input
+    runBrainFuck $ concat input

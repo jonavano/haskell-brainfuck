@@ -26,7 +26,7 @@ source-repository head
 library
   exposed-modules:
       BrainFuck
-      Lib
+      BrainFuck2
   other-modules:
       Paths_brainfuckInterpreter
   hs-source-dirs:
