@@ -48,10 +48,6 @@ executables:
     dependencies:
     - brainfuckInterpreter
 
-    # - transformers
-    # - mtl
-    # - transformers
-
 tests:
   brainfuckInterpreter-test:
     main:                Spec.hs
