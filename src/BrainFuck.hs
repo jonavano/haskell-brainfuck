@@ -1,9 +1,15 @@
+module BrainFuck where
+
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+-- {-# OPTIONS_GHC -package mtl #-}s
+
 -- {-# OPTIONS_GHC -fwarn-incomplete-patterns \#-}
-import           Control.Monad.Trans.State
+-- import qualified Control.Monad.ST as State
+-- import           Control.Monad.Trans
+import           Control.Monad.State
 import           Data.Char
-import           Prelude                           hiding (putChar)
-import           System.Directory.Internal.Prelude (getArgs)
+import           Prelude             hiding (putChar)
+-- import           System.Directory.Internal.Prelude (getArgs)
 
 data Operator = Increase | Decrease | MoveRight | MoveLeft | PutChar | GetChar | Loop [Operator]
   deriving (Show, Eq)
@@ -40,35 +46,18 @@ takeTillMatchingBracket _ _          =  []
 ogTape = Tape ([], 0, replicate 30000 0)
 
 eval :: [Operator] -> State (Tape Int) String
-eval (Increase:xs) = do
-                        y <- increase
-                        ys <- eval xs
-                        return $ y ++ ys
-eval (Decrease:xs) = do
-                        y <- decrease
-                        ys <- eval xs
-                        return $ y ++ ys
-eval (PutChar:xs)  = do
-                        y <- putChar
-                        ys <- eval xs
-                        return $ y ++ ys
-eval (MoveRight:xs) = do
-                        y <- moveRight
-                        ys <- eval xs
-                        return $ y ++ ys
-eval (MoveLeft:xs) = do
-                        y <- moveLeft
-                        ys <- eval xs
-                        return $ y ++ ys
-eval ((Loop ops):xs) = do
-                        y <- loop ops
-                        ys <- eval xs
-                        return $ y ++ ys
-eval _             = return ""
-    where processM f xs = do
-                    y <- f
-                    ys <- eval xs
-                    return $ y ++ ys
+eval (Increase:xs)   = processM increase xs
+eval (Decrease:xs)   = processM decrease xs
+eval (PutChar:xs)    = processM putChar xs
+eval (MoveRight:xs)  = processM moveRight xs
+eval (MoveLeft:xs)   = processM moveLeft xs
+eval ((Loop ops):xs) = processM (loop ops) xs
+eval _               = return ""
+
+processM f xs = do
+    y <- f
+    ys <- eval xs
+    return $ y ++ ys
 
 -- {-# INLINE increase #-}
 increase :: State (Tape Int) String
@@ -126,10 +115,10 @@ loop ys = do
 
 
 
-main :: IO ()
-main = do
+bfmain :: IO ()
+bfmain = do
     -- str <- getContents
-    args <- getArgs
+    -- args <- getArgs
     input <-  lines <$> getContents
     -- putStr input
 
