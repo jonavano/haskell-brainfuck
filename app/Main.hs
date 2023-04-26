@@ -7,5 +7,8 @@ import           BrainFuck2
 
 main :: IO ()
 main = do
-    input <-  lines <$> getContents
-    runBrainFuck $ concat input
+    input <- readFile "resource/halloWorld.bf"
+
+
+    -- input <-  lines <$> getContents
+    runBrainFuck input -- $ concat input
